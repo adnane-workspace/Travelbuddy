@@ -48,8 +48,9 @@ export default function TripMap({ completed, traveling, showPosition }: TripMapP
           ))}
         </MapView>
       </View>
-      <SafeAreaView edges={['bottom']} style={styles.attribution}>
-        <Text style={styles.attributionText}>Trajet à pied · OSRM/FOSSGIS</Text>
+      <SafeAreaView pointerEvents="box-none" edges={['top', 'right']} style={styles.creditsPosition}>
+        <View style={styles.attribution}>
+        <Text style={styles.attributionText}>OSRM/FOSSGIS</Text>
         <Text
           accessibilityRole="link"
           style={styles.attributionLink}
@@ -60,6 +61,7 @@ export default function TripMap({ completed, traveling, showPosition }: TripMapP
           style={styles.attributionLink}
           onPress={() => { void Linking.openURL('https://www.openstreetmap.org/fixthemap'); }}
         >Corriger la carte</Text>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -85,7 +87,8 @@ const styles = StyleSheet.create({
   markerLabel: { color: '#fff', fontWeight: '800' },
   nextMarker: { backgroundColor: '#89431f' },
   completedMarker: { backgroundColor: '#536960' },
-  attribution: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  creditsPosition: { position: 'absolute', top: 12, right: 12 },
+  attribution: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   attributionText: { color: '#4e6258', fontSize: 11 },
   attributionLink: { color: '#285b4b', fontSize: 11, textDecorationLine: 'underline' },
 });

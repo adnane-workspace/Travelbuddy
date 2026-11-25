@@ -27,7 +27,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.page} edges={tab === 'carte' ? [] : undefined}>
+      <SafeAreaView style={styles.page} edges={tab === 'carte' ? ['left', 'right', 'bottom'] : undefined}>
         <StatusBar hidden={tab === 'carte'} style="dark" />
         <KeyboardAvoidingView
           style={styles.page}
@@ -79,31 +79,31 @@ export default function App() {
                       <Text style={styles.buttonLabel}>Activer ma position sur la carte</Text>
                     </Pressable>
                     {locationMessage !== '' && <Text style={styles.muted}>{locationMessage}</Text>}
-              <View style={styles.tripPanel}>
-                <View style={styles.panelHeader}>
-                  <Text accessibilityRole="header" style={styles.brand}>
-                    {next ? `Étape ${completed + 1} sur ${stops.length}` : 'Toutes les étapes terminées'}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: showActivities }}
-                    onPress={() => setShowActivities((visible) => !visible)}
-                    style={styles.activitiesButton}
-                  >
-                    <Text style={styles.brand}>{showActivities ? 'Masquer' : 'Activités'}</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.stopName}>{next?.name ?? 'Journée terminée'}</Text>
-                {next && (
-                  <>
-                    <Text style={styles.muted}>{next.time} · {next.detail}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setCompleted((count) => Math.min(count + 1, stops.length))}
-                      style={styles.button}
-                    >
-                      <Text style={styles.buttonLabel}>Marquer comme terminée</Text>
-                    </Pressable>
+                    <View style={styles.tripPanel}>
+                      <View style={styles.panelHeader}>
+                        <Text accessibilityRole="header" style={styles.brand}>
+                          {next ? `Étape ${completed + 1} sur ${stops.length}` : 'Toutes les étapes terminées'}
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded: showActivities }}
+                          onPress={() => setShowActivities((visible) => !visible)}
+                          style={styles.activitiesButton}
+                        >
+                          <Text style={styles.brand}>{showActivities ? 'Masquer' : 'Activités'}</Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.stopName}>{next?.name ?? 'Journée terminée'}</Text>
+                      {next && (
+                        <>
+                          <Text style={styles.muted}>{next.time} · {next.detail}</Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => setCompleted((count) => Math.min(count + 1, stops.length))}
+                            style={styles.button}
+                          >
+                            <Text style={styles.buttonLabel}>Marquer comme terminée</Text>
+                          </Pressable>
                   </>
                 )}
                 {showActivities && (
@@ -157,20 +157,10 @@ export default function App() {
           ) : (
             <View style={styles.mapScreen}>
               <TripMap completed={completed} traveling={started} showPosition={showPosition} />
-              <SafeAreaView pointerEvents="box-none" edges={['top', 'left']} style={styles.mapBack}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Retour à Organisation"
-                  onPress={() => setTab('organisation')}
-                  style={styles.backButton}
-                >
-                  <Text style={styles.buttonLabel}>‹</Text>
-                </Pressable>
-              </SafeAreaView>
             </View>
           )}
 
-          {tab === 'organisation' && <View accessibilityRole="tablist" style={styles.navigation}>
+          <View accessibilityRole="tablist" style={styles.navigation}>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === 'organisation' }}
@@ -189,7 +179,7 @@ export default function App() {
               <Text style={styles.tabLabel}>Carte</Text>
               {!started && <Text style={styles.muted}>Au départ</Text>}
             </Pressable>
-          </View>}
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -205,8 +195,6 @@ const styles = StyleSheet.create({
   muted: { color: '#4e6258', fontSize: 14, lineHeight: 21 },
   card: { backgroundColor: '#fff', borderRadius: 18, padding: 16, gap: 8 },
   mapScreen: { flex: 1 },
-  mapBack: { position: 'absolute', top: 12, left: 12 },
-  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#19372e', alignItems: 'center', justifyContent: 'center' },
   tripPanel: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 18, paddingBottom: 12, paddingTop: 4, gap: 4 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   activitiesButton: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' },
