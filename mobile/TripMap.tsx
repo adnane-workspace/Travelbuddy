@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 export type TripMapProps = {
   completed: number;
   traveling: boolean;
+  showPosition: boolean;
 };
 
 export default function TripMap(_: TripMapProps) {

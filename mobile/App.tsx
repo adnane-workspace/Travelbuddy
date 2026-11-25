@@ -1,3 +1,4 @@
+import { requestForegroundPermissionsAsync } from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { type ComponentRef, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -10,6 +11,8 @@ export default function App() {
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [showActivities, setShowActivities] = useState(false);
+  const [showPosition, setShowPosition] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<string[]>([]);
   const conversation = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -24,8 +27,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.page}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={styles.page} edges={tab === 'carte' ? [] : undefined}>
+        <StatusBar hidden={tab === 'carte'} style="dark" />
         <KeyboardAvoidingView
           style={styles.page}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -62,44 +65,20 @@ export default function App() {
                     </Pressable>
                   )}
                 </View>
-                <Text style={styles.muted}>Chat de démonstration</Text>
-                <View style={styles.card}>
-                  <Text style={styles.stopName}>Parle-moi de ton voyage</Text>
-                  <Text style={styles.muted}>Où veux-tu partir, combien de jours et avec quel budget ?</Text>
-                </View>
-                {messages.map((message, index) => (
-                  <View key={index} style={styles.bubble}>
-                    <Text style={styles.bubbleLabel}>{message}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-              <View style={styles.composer}>
-                <TextInput
-                  accessibilityLabel="Ton message"
-                  onChangeText={setDraft}
-                  onSubmitEditing={sendMessage}
-                  placeholder="Ton message…"
-                  placeholderTextColor="#4e6258"
-                  returnKeyType="send"
-                  style={styles.input}
-                  value={draft}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={!draft.trim()}
-                  onPress={sendMessage}
-                  style={[styles.button, !draft.trim() && styles.disabled]}
-                >
-                  <Text style={styles.buttonLabel}>Envoyer</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <View style={styles.mapScreen}>
-              <TripMap completed={completed} traveling={started} />
-              <View pointerEvents="none" style={styles.mapTitle}>
-                <Text accessibilityRole="header" style={styles.mapTitleText}>Marrakech à pied</Text>
-              </View>
+                {started && (
+                  <>
+                    <Pressable accessibilityRole="button" style={styles.button} onPress={async () => {
+                      try {
+                        const { granted } = await requestForegroundPermissionsAsync();
+                        setShowPosition(granted);
+                        setLocationMessage(granted ? 'Position activée sur la carte' : 'Autorise la localisation dans les réglages.');
+                      } catch {
+                        setLocationMessage('Localisation indisponible.');
+                      }
+                    }}>
+                      <Text style={styles.buttonLabel}>Activer ma position sur la carte</Text>
+                    </Pressable>
+                    {locationMessage !== '' && <Text style={styles.muted}>{locationMessage}</Text>}
               <View style={styles.tripPanel}>
                 <View style={styles.panelHeader}>
                   <Text accessibilityRole="header" style={styles.brand}>
@@ -141,10 +120,57 @@ export default function App() {
                   </ScrollView>
                 )}
               </View>
+                  </>
+                )}
+                <Text style={styles.muted}>Chat de démonstration</Text>
+                <View style={styles.card}>
+                  <Text style={styles.stopName}>Parle-moi de ton voyage</Text>
+                  <Text style={styles.muted}>Où veux-tu partir, combien de jours et avec quel budget ?</Text>
+                </View>
+                {messages.map((message, index) => (
+                  <View key={index} style={styles.bubble}>
+                    <Text style={styles.bubbleLabel}>{message}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.composer}>
+                <TextInput
+                  accessibilityLabel="Ton message"
+                  onChangeText={setDraft}
+                  onSubmitEditing={sendMessage}
+                  placeholder="Ton message…"
+                  placeholderTextColor="#4e6258"
+                  returnKeyType="send"
+                  style={styles.input}
+                  value={draft}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!draft.trim()}
+                  onPress={sendMessage}
+                  style={[styles.button, !draft.trim() && styles.disabled]}
+                >
+                  <Text style={styles.buttonLabel}>Envoyer</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <View style={styles.mapScreen}>
+              <TripMap completed={completed} traveling={started} showPosition={showPosition} />
+              <SafeAreaView pointerEvents="box-none" edges={['top', 'left']} style={styles.mapBack}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retour à Organisation"
+                  onPress={() => setTab('organisation')}
+                  style={styles.backButton}
+                >
+                  <Text style={styles.buttonLabel}>‹</Text>
+                </Pressable>
+              </SafeAreaView>
             </View>
           )}
 
-          <View accessibilityRole="tablist" style={styles.navigation}>
+          {tab === 'organisation' && <View accessibilityRole="tablist" style={styles.navigation}>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: tab === 'organisation' }}
@@ -163,7 +189,7 @@ export default function App() {
               <Text style={styles.tabLabel}>Carte</Text>
               {!started && <Text style={styles.muted}>Au départ</Text>}
             </Pressable>
-          </View>
+          </View>}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -179,8 +205,8 @@ const styles = StyleSheet.create({
   muted: { color: '#4e6258', fontSize: 14, lineHeight: 21 },
   card: { backgroundColor: '#fff', borderRadius: 18, padding: 16, gap: 8 },
   mapScreen: { flex: 1 },
-  mapTitle: { position: 'absolute', top: 12, left: 12, backgroundColor: '#19372e', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  mapTitleText: { color: '#fff', fontWeight: '700' },
+  mapBack: { position: 'absolute', top: 12, left: 12 },
+  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#19372e', alignItems: 'center', justifyContent: 'center' },
   tripPanel: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 18, paddingBottom: 12, paddingTop: 4, gap: 4 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   activitiesButton: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' },
