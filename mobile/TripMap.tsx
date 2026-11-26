@@ -1,9 +1,17 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+export type WalkingRoute = {
+  coordinates: { latitude: number; longitude: number }[];
+  distance: number;
+  duration: number;
+};
+
 export type TripMapProps = {
   completed: number;
   traveling: boolean;
   showPosition: boolean;
+  onPositionEnabled?: () => void;
+  walkingRoute?: WalkingRoute;
 };
 
 export default function TripMap(_: TripMapProps) {

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TravelBuddy · MapLibre 3D</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.19.0/dist/maplibre-gl.css">
+<style>
+  html,body,#map{width:100%;height:100%;margin:0;background:#e6ebe2}
+  #status{position:absolute;bottom:28px;left:8px;padding:6px 10px;border-radius:8px;background:#fff;color:#19372e;font:14px system-ui;pointer-events:none}
+  .destination{width:18px;height:18px;border:3px solid #fff;border-radius:50%;background:#285b4b;box-shadow:0 2px 6px #0005}
+</style>
+<div id="map"></div>
+<div id="status" role="status">Chargement de la carte…</div>
+<script type="module" src="maplibre.js"></script>
+</html>

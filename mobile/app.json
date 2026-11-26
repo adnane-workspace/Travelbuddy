@@ -5,11 +5,25 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "@rnmapbox/maps",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TravelBuddy utilise votre position pour afficher et calculer votre trajet."
+        }
+      ]
+    ],
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.travelbuddy.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.travelbuddy.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +34,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1a25a123-6848-49d8-9ae3-03f3ff46175a"
+      }
     }
   }
 }

@@ -1,15 +1,21 @@
-import { requestForegroundPermissionsAsync } from 'expo-location';
+import { getCurrentPositionAsync, requestForegroundPermissionsAsync } from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { type ComponentRef, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import TripMap from './TripMap';
+import TripMap, { type WalkingRoute } from './TripMap';
 import { stops } from './demoTrip';
+import { fetchRoute, type RouteProfile } from './mapping/routing';
 
 export default function App() {
   const [tab, setTab] = useState<'organisation' | 'carte'>('organisation');
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(0);
+  const [walkingRoute, setWalkingRoute] = useState<{ stopIndex: number; profile: RouteProfile; route: WalkingRoute }>();
+  const [routeError, setRouteError] = useState<{ stopIndex: number; message: string }>();
+  const [loadingRoute, setLoadingRoute] = useState(false);
+  const routeRequestInProgress = useRef(false);
+  const lastRouteRequest = useRef(0);
   const [showActivities, setShowActivities] = useState(false);
   const [showPosition, setShowPosition] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
@@ -17,12 +23,44 @@ export default function App() {
   const [messages, setMessages] = useState<string[]>([]);
   const conversation = useRef<ComponentRef<typeof ScrollView>>(null);
   const next = stops[completed];
+  const activeRoute = walkingRoute?.stopIndex === completed ? walkingRoute.route : undefined;
 
   function sendMessage() {
     const message = draft.trim();
     if (!message) return;
     setMessages((previous) => [...previous, message]);
     setDraft('');
+  }
+
+  function completeCurrentStop() {
+    if (!next) return;
+    setCompleted((count) => count === completed ? count + 1 : count);
+  }
+
+  async function showDirections(profile: RouteProfile) {
+    if (!next || routeRequestInProgress.current || Date.now() - lastRouteRequest.current < 1000) return;
+    routeRequestInProgress.current = true;
+    setLoadingRoute(true);
+    setRouteError(undefined);
+
+    try {
+      const { granted } = await requestForegroundPermissionsAsync();
+      if (!granted) {
+        setRouteError({ stopIndex: completed, message: 'Autorise la localisation pour calculer le trajet.' });
+        return;
+      }
+
+      const { coords } = await getCurrentPositionAsync();
+      lastRouteRequest.current = Date.now();
+      const route = await fetchRoute(coords, next.coordinate, profile);
+      setWalkingRoute({ stopIndex: completed, profile, route });
+      setShowPosition(true);
+    } catch {
+      setRouteError({ stopIndex: completed, message: 'Trajet indisponible depuis ta position. Vérifie ta connexion et réessaie.' });
+    } finally {
+      routeRequestInProgress.current = false;
+      setLoadingRoute(false);
+    }
   }
 
   return (
@@ -99,7 +137,7 @@ export default function App() {
                           <Text style={styles.muted}>{next.time} · {next.detail}</Text>
                           <Pressable
                             accessibilityRole="button"
-                            onPress={() => setCompleted((count) => Math.min(count + 1, stops.length))}
+                            onPress={completeCurrentStop}
                             style={styles.button}
                           >
                             <Text style={styles.buttonLabel}>Marquer comme terminée</Text>
@@ -156,7 +194,46 @@ export default function App() {
             </>
           ) : (
             <View style={styles.mapScreen}>
-              <TripMap completed={completed} traveling={started} showPosition={showPosition} />
+              <TripMap completed={completed} traveling={started} showPosition={showPosition}
+                onPositionEnabled={() => setShowPosition(true)} walkingRoute={activeRoute} />
+              <View style={styles.mapStopCard}>
+                <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.brand}>
+                  {next ? `Prochaine étape · ${completed + 1}/${stops.length}` : 'Toutes les étapes terminées'}
+                </Text>
+                {next && (
+                  <>
+                    <Text style={styles.stopName}>{next.name}</Text>
+                    <Text style={styles.muted}>{next.time} · {next.detail}</Text>
+                    {activeRoute && (
+                      <Text accessibilityLiveRegion="polite" style={styles.brand}>
+                        {Math.max(1, Math.round(activeRoute.duration / 60))} min {walkingRoute?.profile === 'driving' ? 'en voiture' : 'à pied'} · {activeRoute.distance < 1000
+                          ? `${Math.round(activeRoute.distance)} m`
+                          : `${(activeRoute.distance / 1000).toFixed(1).replace('.', ',')} km`}
+                      </Text>
+                    )}
+                    {routeError?.stopIndex === completed && (
+                      <Text accessibilityLiveRegion="polite" style={styles.muted}>{routeError.message}</Text>
+                    )}
+                    <View style={styles.mapActions}>
+                      {Platform.OS !== 'web' && (
+                        <Pressable accessibilityRole="button" accessibilityState={{ busy: loadingRoute }} disabled={loadingRoute} onPress={() => void showDirections('walking')} style={[styles.button, styles.directionsButton, loadingRoute && styles.disabled]}>
+                          <Text style={[styles.buttonLabel, styles.directionsLabel]}>
+                            {loadingRoute ? 'Calcul en cours…' : 'À pied'}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {Platform.OS !== 'web' && (
+                        <Pressable accessibilityRole="button" disabled={loadingRoute} onPress={() => void showDirections('driving')} style={[styles.button, styles.directionsButton, loadingRoute && styles.disabled]}>
+                          <Text style={[styles.buttonLabel, styles.directionsLabel]}>En voiture</Text>
+                        </Pressable>
+                      )}
+                      <Pressable accessibilityRole="button" onPress={completeCurrentStop} style={styles.button}>
+                        <Text style={styles.buttonLabel}>Marquer comme terminée</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
           )}
 
@@ -195,6 +272,10 @@ const styles = StyleSheet.create({
   muted: { color: '#4e6258', fontSize: 14, lineHeight: 21 },
   card: { backgroundColor: '#fff', borderRadius: 18, padding: 16, gap: 8 },
   mapScreen: { flex: 1 },
+  mapStopCard: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
+  mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  directionsButton: { backgroundColor: '#d9e7db' },
+  directionsLabel: { color: '#19372e' },
   tripPanel: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 18, paddingBottom: 12, paddingTop: 4, gap: 4 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   activitiesButton: { paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' },
