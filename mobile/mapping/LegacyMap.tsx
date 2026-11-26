@@ -2,20 +2,19 @@ import { getCurrentPositionAsync, requestForegroundPermissionsAsync } from 'expo
 import { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, type Camera, type MapType } from 'react-native-maps';
-import { stops } from '../demoTrip';
 import { routeCoordinates } from '../demoWalkingRoute';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TripMapProps } from '../TripMap';
 
 const tripCamera: Camera = {
-  center: { latitude: 31.634, longitude: -7.9948 },
-  pitch: 45,
+  center: { latitude: 34.064, longitude: -4.978 },
+  pitch: 0,
   heading: 0,
   zoom: 13.7,
   altitude: 4250,
 };
 
-export default function LegacyMap({ completed, showPosition, walkingRoute, onPositionEnabled, routeDestination, guidance,
+export default function LegacyMap({ stops, completed, showPosition, walkingRoute, onPositionEnabled, routeDestination, guidance,
   google, flat, selected, onSelect }: TripMapProps & {
     google: boolean;
     flat: boolean;
@@ -24,13 +23,20 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
   }) {
   const map = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [mapType, setMapType] = useState<MapType>('hybrid');
+  const [mapType, setMapType] = useState<MapType>('standard');
   const [layersOpen, setLayersOpen] = useState(false);
   const [traffic, setTraffic] = useState(false);
   const [positionMessage, setPositionMessage] = useState('');
   const coordinates = walkingRoute?.coordinates ?? (routeDestination ? undefined : routeCoordinates);
   const guiding = guidance !== undefined;
   const position = guidance?.position;
+  const [following, setFollowing] = useState(true);
+  const [navigationFlat, setNavigationFlat] = useState(true);
+
+  useEffect(() => {
+    setFollowing(true);
+    setNavigationFlat(true);
+  }, [guiding]);
 
   useEffect(() => {
     if (!mapReady || guiding) return;
@@ -49,12 +55,12 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
   }, [mapReady, flat, guiding]);
 
   useEffect(() => {
-    if (!mapReady || !position) return;
+    if (!mapReady || !position || !following) return;
     map.current?.animateCamera({
-      center: position, zoom: 17, altitude: 650, pitch: 58,
+      center: position, zoom: 17.5, altitude: 500, pitch: navigationFlat ? 0 : 35,
       ...(position.heading !== null && position.heading >= 0 && { heading: position.heading }),
     }, { duration: 650 });
-  }, [mapReady, position]);
+  }, [mapReady, position, following, navigationFlat]);
 
   async function recenter() {
     setPositionMessage('');
@@ -81,24 +87,28 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
           style={StyleSheet.absoluteFill}
           initialCamera={tripCamera}
           onMapReady={() => setMapReady(true)}
-          mapType={mapType}
+          mapType={guiding ? 'standard' : mapType}
+          userInterfaceStyle="light"
+          onPanDrag={() => { if (guiding) setFollowing(false); }}
+          mapPadding={guiding ? { top: 170, right: 24, bottom: 100, left: 24 } : undefined}
           showsTraffic={google && traffic}
-          showsBuildings={!flat}
+          showsBuildings={!guiding && !flat}
           pitchEnabled
           showsCompass
-          showsPointsOfInterests
+          showsPointsOfInterests={false}
           showsUserLocation={showPosition}
           showsMyLocationButton={false}
         >
           {coordinates && (
             <>
-              <Polyline coordinates={coordinates} strokeColor="#102c26" strokeWidth={10} zIndex={0} />
-              <Polyline coordinates={coordinates} strokeColor="#6ce5bc" strokeWidth={6} zIndex={1} />
+              <Polyline coordinates={coordinates} strokeColor="#ffffff" strokeWidth={13} zIndex={0} />
+              <Polyline coordinates={coordinates} strokeColor={guiding ? '#87909b' : '#3830c9'} strokeWidth={8} zIndex={1} />
+              {guiding && <Polyline coordinates={guidance.remainingCoordinates ?? coordinates} strokeColor="#3830c9" strokeWidth={9} zIndex={2} />}
             </>
           )}
-          {stops.map(({ name, time, detail, coordinate }, index) => (
+          {stops.map(({ name, time, detail, coordinate }, index) => (!guiding || index === completed) && (
             <Marker
-              key={name}
+              key={index}
               coordinate={coordinate}
               title={`${index + 1}. ${name}`}
               description={`${time} · ${index < completed ? 'Terminée' : detail}`}
@@ -116,6 +126,17 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
           ))}
         </MapView>
       </View>
+      {guiding && <View style={styles.mapControls}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Changer l’inclinaison de la carte" style={styles.control} onPress={() => {
+          setNavigationFlat((value) => !value);
+          setFollowing(true);
+        }}>
+          <Text style={styles.controlLabel}>{navigationFlat ? 'Vue 3D' : 'Vue 2D'}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" style={styles.control} disabled={!position} onPress={() => setFollowing(true)}>
+          <Text style={styles.controlLabel}>{following ? 'Suivi GPS' : 'Recentrer'}</Text>
+        </Pressable>
+      </View>}
       {!guiding && <View style={styles.mapControls}>
         <Pressable style={styles.control} accessibilityRole="button" accessibilityState={{ expanded: layersOpen }} onPress={() => setLayersOpen((open) => !open)}>
           <Text style={styles.controlLabel}>Couches</Text>
@@ -139,7 +160,7 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
           <Text accessibilityLiveRegion="polite" style={styles.controlLabel}>{positionMessage || 'Ma position'}</Text>
         </Pressable>
       </View>}
-      <SafeAreaView pointerEvents="box-none" edges={['top', 'right']} style={styles.creditsPosition}>
+      <SafeAreaView pointerEvents="box-none" edges={['left']} style={styles.creditsPosition}>
         <View style={styles.attribution}>
         <Text style={styles.attributionText}>OSRM/FOSSGIS</Text>
         <Text
@@ -147,11 +168,6 @@ export default function LegacyMap({ completed, showPosition, walkingRoute, onPos
           style={styles.attributionLink}
           onPress={() => { void Linking.openURL('https://www.openstreetmap.org/copyright'); }}
         >© OpenStreetMap</Text>
-        <Text
-          accessibilityRole="link"
-          style={styles.attributionLink}
-          onPress={() => { void Linking.openURL('https://www.openstreetmap.org/fixthemap'); }}
-        >Corriger la carte</Text>
         </View>
       </SafeAreaView>
     </View>
@@ -179,11 +195,11 @@ const styles = StyleSheet.create({
   nextMarker: { backgroundColor: '#89431f' },
   completedMarker: { backgroundColor: '#536960' },
   creditsPosition: { position: 'absolute', bottom: 28, left: 8 },
-  mapControls: { position: 'absolute', bottom: 34, right: 10, alignItems: 'flex-end', gap: 6 },
-  layerMenu: { gap: 2, alignItems: 'stretch' },
-  control: { backgroundColor: '#f7f4ec', paddingHorizontal: 14, minHeight: 44, borderRadius: 14, justifyContent: 'center', elevation: 3 },
+  mapControls: { position: 'absolute', bottom: 62, right: 16, alignItems: 'flex-end', gap: 10 },
+  layerMenu: { gap: 4, alignItems: 'stretch', backgroundColor: '#fffdf8', padding: 6, borderRadius: 18 },
+  control: { backgroundColor: '#fffdf8', paddingHorizontal: 16, minHeight: 46, borderRadius: 16, justifyContent: 'center', elevation: 2, borderWidth: StyleSheet.hairlineWidth, borderColor: '#dce5dc' },
   controlLabel: { color: '#19372e', fontWeight: '700' },
-  attribution: { backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  attribution: { flexDirection: 'row', gap: 6, backgroundColor: '#fffdf8', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   attributionText: { color: '#4e6258', fontSize: 11 },
   attributionLink: { color: '#285b4b', fontSize: 11, textDecorationLine: 'underline' },
 });

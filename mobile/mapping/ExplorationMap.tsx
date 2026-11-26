@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { viewerCommand, viewerEvent, type Destination } from './bridge';
+import { viewerCommand, viewerEvent, type Destination, type SelectedPlace } from './bridge';
 
-export default function ExplorationMap({ url, destination, flat, onFailure }: {
+export default function ExplorationMap({ url, destination, flat, onFailure, onPlaceSelected }: {
   url: string;
   destination: Destination;
   flat: boolean;
   onFailure: () => void;
+  onPlaceSelected: (place: SelectedPlace) => void;
 }) {
   const web = useRef<WebView<Record<never, never>>>(null);
   const [ready, setReady] = useState(false);
@@ -44,6 +45,7 @@ export default function ExplorationMap({ url, destination, flat, onFailure }: {
           if (event === 'ready') setReady(true);
           if (event === 'fallback') setFallback(true);
           if (event === 'error') onFailure();
+          if (typeof event === 'object' && event.type === 'placeSelected') onPlaceSelected(event.place);
         }}
       />
       {!ready && <ActivityIndicator style={StyleSheet.absoluteFill} accessibilityLabel="Chargement de la carte 3D" />}

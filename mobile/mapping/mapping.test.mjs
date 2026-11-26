@@ -6,8 +6,8 @@ import { resolveViewerUrl, viewerCommand, viewerEvent } from './bridge.ts';
 import { fetchRoute } from './routing.ts';
 import { getGuidance } from './guidance.ts';
 
-const start = { longitude: -8.0032, latitude: 31.6417 };
-const end = { longitude: -7.9878, latitude: 31.6311 };
+const start = { longitude: -4.98389, latitude: 34.06167 };
+const end = { longitude: -4.973694, latitude: 34.065083 };
 
 test('the viewer URL permits private HTTP only during development', () => {
   const localUrl = 'http://192.168.1.20:8766/';
@@ -17,6 +17,18 @@ test('the viewer URL permits private HTTP only during development', () => {
   assert.equal(resolveViewerUrl('https://example.com/exploration/', false), 'https://example.com/exploration/');
   assert.equal(resolveViewerUrl(undefined, true, 'http://192.168.1.20:8081/index.bundle'), localUrl);
   assert.equal(resolveViewerUrl(undefined, false, 'http://192.168.1.20:8081/index.bundle'), undefined);
+});
+
+test('place selection accepts valid coordinates and rejects malformed web messages', () => {
+  const place = { id: 'place-1', name: ' Café ', address: 'Fès', coordinate: start };
+  const encode = (value) => JSON.stringify({ version: 1, type: 'placeSelected', place: value });
+  assert.deepEqual(viewerEvent(encode(place)), {
+    type: 'placeSelected', place: { ...place, name: 'Café' },
+  });
+  assert.equal(viewerEvent(encode({ ...place, coordinate: { latitude: 100, longitude: 0 } })), undefined);
+  assert.equal(viewerEvent(encode({ ...place, coordinate: { latitude: '31', longitude: 0 } })), undefined);
+  assert.equal(viewerEvent(encode({ ...place, name: ' ' })), undefined);
+  assert.equal(viewerEvent(encode(null)), undefined);
 });
 
 test('the native command delivers a destination and view mode to the viewer', () => {
@@ -96,6 +108,11 @@ test('guidance advances along the route and detects deviation and arrival', () =
   const before = getGuidance(route, { latitude: 0, longitude: 0.0025 });
   assert.equal(before.instruction, 'Tournez à droite vers Rue du Jardin');
   assert.equal(before.detail, 'Dans 250 m');
+  assert.equal(before.arrow, '↱');
+  assert.match(before.following, /destination/);
+  assert.equal(before.heading, 90);
+  assert.equal(before.remainingCoordinates.length, 2);
+  assert.ok(Math.abs(before.remainingCoordinates[0].longitude - 0.0025) < 0.000001);
   assert.equal(getGuidance(route, { latitude: 0, longitude: 0.008 }).instruction, 'Rejoignez votre destination');
   assert.equal(getGuidance(route, { latitude: 0.001, longitude: 0.005 }).offRoute, true);
   assert.equal(getGuidance(route, route.coordinates[1]).arrived, true);

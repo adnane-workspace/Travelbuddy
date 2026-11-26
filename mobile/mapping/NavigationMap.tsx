@@ -2,14 +2,13 @@ import Mapbox from '@rnmapbox/maps';
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentPositionAsync, requestForegroundPermissionsAsync } from 'expo-location';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { stops } from '../demoTrip';
 import { routeCoordinates } from '../demoWalkingRoute';
 import type { TripMapProps } from '../TripMap';
 
 const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 if (token?.startsWith('pk.')) void Mapbox.setAccessToken(token);
 
-export default function NavigationMap({ completed, showPosition, onPositionEnabled, walkingRoute, routeDestination, guidance, selected, onSelect, flat, dark, onFailure }: TripMapProps & {
+export default function NavigationMap({ stops, completed, showPosition, onPositionEnabled, walkingRoute, routeDestination, guidance, selected, onSelect, flat, dark, onFailure }: TripMapProps & {
   selected: number;
   onSelect: (index: number) => void;
   flat: boolean;
@@ -23,6 +22,8 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
   const route = walkingRoute?.coordinates ?? (routeDestination ? undefined : routeCoordinates);
   const guiding = guidance !== undefined;
   const position = guidance?.position;
+  const [following, setFollowing] = useState(true);
+  useEffect(() => { setFollowing(true); }, [guiding]);
 
   useEffect(() => {
     if (!ready || guiding) return;
@@ -50,13 +51,14 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
   }, [ready, stop, flat, walkingRoute, routeDestination, selected, completed, guiding]);
 
   useEffect(() => {
-    if (!ready || !position) return;
+    if (!ready || !position || !following) return;
     camera.current?.setCamera({
       centerCoordinate: [position.longitude, position.latitude],
-      zoomLevel: 17, pitch: 58, animationMode: 'easeTo', animationDuration: 650,
+      zoomLevel: 17.5, pitch: 0, animationMode: 'easeTo', animationDuration: 650,
+      padding: { paddingTop: 170, paddingBottom: 100, paddingLeft: 24, paddingRight: 24 },
       ...(position.heading !== null && position.heading >= 0 && { heading: position.heading }),
     });
-  }, [ready, position]);
+  }, [ready, position, following]);
 
   useEffect(() => {
     if (ready) return;
@@ -83,10 +85,11 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
   return (
     <View style={styles.map}>
     <Mapbox.MapView style={styles.map} styleURL="mapbox://styles/mapbox/standard" compassEnabled
+      onTouchStart={() => { if (guiding) setFollowing(false); }}
       scaleBarEnabled={false} onDidFinishLoadingMap={() => setReady(true)} onMapLoadingError={onFailure}>
-      <Mapbox.Camera ref={camera} defaultSettings={{ centerCoordinate: [-7.9948, 31.634], zoomLevel: 13 }} />
-      <Mapbox.StyleImport id="basemap" existing config={{ lightPreset: dark ? 'night' : 'day', show3dObjects: !flat }} />
-      {!flat && (
+      <Mapbox.Camera ref={camera} defaultSettings={{ centerCoordinate: [-4.978, 34.064], zoomLevel: 13 }} />
+      <Mapbox.StyleImport id="basemap" existing config={{ lightPreset: dark ? 'night' : 'day', show3dObjects: !guiding && !flat }} />
+      {!guiding && !flat && (
         <Mapbox.RasterDemSource id="terrain-source" url="mapbox://mapbox.mapbox-terrain-dem-v1" tileSize={512}>
           <Mapbox.Terrain sourceID="terrain-source" exaggeration={1} />
         </Mapbox.RasterDemSource>
@@ -95,11 +98,17 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
       {route && <Mapbox.ShapeSource id="trip-route" shape={{ type: 'Feature', properties: {}, geometry: {
         type: 'LineString', coordinates: route.map(({ longitude, latitude }) => [longitude, latitude]),
       } }}>
-        <Mapbox.LineLayer id="trip-route-outline" style={{ lineColor: '#102c26', lineWidth: 8, lineJoin: 'round' }} />
-        <Mapbox.LineLayer id="trip-route-line" style={{ lineColor: '#6ce5bc', lineWidth: 5, lineJoin: 'round' }} />
+        <Mapbox.LineLayer id="trip-route-outline" style={{ lineColor: '#ffffff', lineWidth: 13, lineJoin: 'round' }} />
+        <Mapbox.LineLayer id="trip-route-line" style={{ lineColor: guiding ? '#87909b' : '#3830c9', lineWidth: 8, lineJoin: 'round' }} />
       </Mapbox.ShapeSource>}
-      {stops.map(({ name, coordinate }, index) => (
-        <Mapbox.PointAnnotation key={name} id={`stop-${index}`} title={name}
+      {guidance?.remainingCoordinates && <Mapbox.ShapeSource id="remaining-route" shape={{
+        type: 'Feature', properties: {}, geometry: { type: 'LineString',
+          coordinates: guidance.remainingCoordinates.map(({ longitude, latitude }) => [longitude, latitude]) },
+      }}>
+        <Mapbox.LineLayer id="remaining-route-line" style={{ lineColor: '#3830c9', lineWidth: 9, lineJoin: 'round' }} />
+      </Mapbox.ShapeSource>}
+      {stops.map(({ name, coordinate }, index) => (!guiding || index === completed) && (
+        <Mapbox.PointAnnotation key={String(index)} id={`stop-${index}`} title={name}
           coordinate={[coordinate.longitude, coordinate.latitude]} onSelected={() => onSelect(index)}>
           <View style={[styles.marker, index === selected && styles.selected]}>
             <Text style={styles.markerText}>{index < completed ? '✓' : index + 1}</Text>
@@ -107,6 +116,9 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
         </Mapbox.PointAnnotation>
       ))}
     </Mapbox.MapView>
+    {guiding && <Pressable accessibilityRole="button" style={styles.recenter} disabled={!position} onPress={() => setFollowing(true)}>
+      <Text style={styles.recenterLabel}>{following ? 'Suivi GPS' : 'Recentrer'}</Text>
+    </Pressable>}
     {ready && !guiding && (
       <Pressable accessibilityRole="button" style={styles.recenter} onPress={() => void recenter()}>
         <Text accessibilityLiveRegion="polite" style={styles.recenterLabel}>{positionMessage || 'Ma position'}</Text>

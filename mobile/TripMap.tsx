@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import type { Destination } from './mapping/bridge';
+import type { Destination, SelectedPlace } from './mapping/bridge';
 import type { RouteManeuver } from './mapping/guidance';
 
 export type WalkingRoute = {
@@ -10,10 +10,19 @@ export type WalkingRoute = {
 };
 
 export type TripMapProps = {
+  stops: { name: string; detail: string; time: string; coordinate: Destination }[];
+  onPlaceSelected: (place: SelectedPlace) => void;
   completed: number;
   showPosition: boolean;
   routeDestination?: string;
-  guidance?: { instruction: string; detail: string; position?: Destination & { heading: number | null } };
+  guidance?: {
+    instruction: string;
+    detail: string;
+    arrow?: string;
+    following?: string;
+    remainingCoordinates?: Destination[];
+    position?: Destination & { heading: number | null };
+  };
   onPositionEnabled?: () => void;
   walkingRoute?: WalkingRoute;
 };

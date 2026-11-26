@@ -1,15 +1,22 @@
 import { Accuracy, getCurrentPositionAsync, requestForegroundPermissionsAsync, watchPositionAsync, type LocationObjectCoords } from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import TripMap, { type WalkingRoute } from './TripMap';
-import { stops } from './demoTrip';
+import { stops as demoStops } from './demoTrip';
+import type { SelectedPlace } from './mapping/bridge';
 import { fetchRoute, type RouteProfile } from './mapping/routing';
 import { formatDistance, getGuidance } from './mapping/guidance';
+import { ChatScreen, SettingsScreen, welcomeMessage, type ChatMessage } from './CompanionScreens';
+import BottomNavigation, { type NavigationTab } from './BottomNavigation';
 
 export default function App() {
-  const [tab, setTab] = useState<'organisation' | 'carte'>('organisation');
+  const { height: windowHeight } = useWindowDimensions();
+  const [stops, setStops] = useState(demoStops);
+  const routeVersion = useRef(0);
+  const [tab, setTab] = useState<NavigationTab>('organisation');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [mapDetailsOpen, setMapDetailsOpen] = useState(false);
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(0);
@@ -35,7 +42,21 @@ export default function App() {
   function completeCurrentStop() {
     if (!next) return;
     setGuiding(false);
+    routeVersion.current += 1;
     setCompleted((count) => count === completed ? count + 1 : count);
+  }
+
+  function addPlace(place: SelectedPlace) {
+    routeVersion.current += 1;
+    setGuiding(false);
+    setWalkingRoute(undefined);
+    setRouteError(undefined);
+    setStops((previous) => [
+      ...previous.slice(0, completed),
+      { name: place.name, detail: place.address, time: 'Pause', coordinate: place.coordinate },
+      ...previous.slice(completed),
+    ]);
+    setMapDetailsOpen(true);
   }
 
   useEffect(() => {
@@ -74,23 +95,29 @@ export default function App() {
     setRouteProfile(profile);
     if (Platform.OS === 'web') return;
     routeRequestInProgress.current = true;
+    const version = routeVersion.current;
     setLoadingProfile(profile);
     setRouteError(undefined);
 
     try {
       const { granted } = await requestForegroundPermissionsAsync();
+      if (version !== routeVersion.current) return;
       if (!granted) {
         setRouteError({ stopIndex: completed, message: 'Autorise la localisation pour calculer le trajet.' });
         return;
       }
 
       const { coords } = await getCurrentPositionAsync();
+      if (version !== routeVersion.current) return;
       lastRouteRequest.current = Date.now();
       const route = await fetchRoute(coords, next.coordinate, profile);
+      if (version !== routeVersion.current) return;
       setWalkingRoute({ stopIndex: completed, profile, route });
+      setGuidancePosition(coords);
       setShowPosition(true);
       setLocationMessage('');
     } catch {
+      if (version !== routeVersion.current) return;
       setRouteError({ stopIndex: completed, message: 'Trajet indisponible depuis ta position. Vérifie ta connexion et réessaie.' });
     } finally {
       routeRequestInProgress.current = false;
@@ -109,7 +136,6 @@ export default function App() {
 
   function startGuidance() {
     if (!activeRoute) return;
-    setGuidancePosition(undefined);
     setGuidanceError(false);
     setGuiding(true);
   }
@@ -118,20 +144,24 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.page} edges={tab === 'carte' ? ['left', 'right', 'bottom'] : undefined}>
         <StatusBar style={tab === 'carte' ? 'light' : 'dark'} />
-        <KeyboardAvoidingView style={styles.page} behavior={tab === 'carte' && Platform.OS === 'ios' ? 'padding' : undefined}>
-          {tab === 'organisation' ? (
+        <KeyboardAvoidingView style={styles.page} behavior={(tab === 'carte' || tab === 'chat') && Platform.OS === 'ios' ? 'padding' : undefined}>
+          {tab === 'chat' ? (
+            <ChatScreen messages={chatMessages} onMessagesChange={setChatMessages} />
+          ) : tab === 'settings' ? (
+            <SettingsScreen />
+          ) : tab === 'organisation' ? (
             <ScrollView style={styles.organisation} contentContainerStyle={styles.content}>
               <Text style={styles.wordmark}>TravelBuddy</Text>
               <View style={styles.hero}>
                 <Text style={styles.heroMeta}>Maroc · Voyage de démonstration</Text>
-                <Text accessibilityRole="header" style={styles.heading}>Marrakech</Text>
+                <Text accessibilityRole="header" style={styles.heading}>Fès</Text>
                 <View accessible accessibilityRole="progressbar"
                   accessibilityLabel="Progression du voyage"
                   accessibilityValue={{ min: 0, now: completed, max: stops.length }} style={styles.progress}>
                   <Text style={styles.heroMeta}>{completed} sur {stops.length} étapes terminées</Text>
                   <View style={styles.progressTrack}>
-                    {stops.map((stop, index) => (
-                      <View key={stop.name} style={[styles.progressSegment, index < completed && styles.progressCompleted]} />
+                    {stops.map((_, index) => (
+                      <View key={index} style={[styles.progressSegment, index < completed && styles.progressCompleted]} />
                     ))}
                   </View>
                 </View>
@@ -146,7 +176,7 @@ export default function App() {
                 {stops.map((stop, index) => {
                   const current = started && index === completed;
                   return (
-                    <View key={stop.name} style={[styles.agendaRow, current && styles.currentRow]}>
+                    <View key={index} style={[styles.agendaRow, current && styles.currentRow]}>
                       <Text style={styles.time}>{stop.time}</Text>
                       <View style={styles.stop}>
                         <Text style={styles.stopName}>{stop.name}</Text>
@@ -177,22 +207,30 @@ export default function App() {
             </ScrollView>
           ) : (
             <View style={styles.mapScreen}>
-              <TripMap completed={completed} showPosition={showPosition} routeDestination={mapDetailsOpen ? next?.name : undefined}
+              <TripMap stops={stops} onPlaceSelected={addPlace} completed={completed} showPosition={showPosition} routeDestination={mapDetailsOpen ? next?.name : undefined}
                 onPositionEnabled={() => setShowPosition(true)} walkingRoute={activeRoute}
                 guidance={guiding ? {
                   instruction: guidanceError ? 'Signal GPS indisponible' : liveGuidance?.instruction ?? 'Recherche de votre position…',
                   detail: guidanceError ? '' : liveGuidance?.detail ?? '',
-                  position: guidancePosition,
+                  arrow: guidanceError ? '…' : liveGuidance?.arrow,
+                  following: guidanceError ? undefined : liveGuidance?.following,
+                  remainingCoordinates: liveGuidance?.remainingCoordinates,
+                  position: guidancePosition ? {
+                    ...guidancePosition,
+                    heading: guidancePosition.heading !== null && guidancePosition.heading >= 0
+                      ? guidancePosition.heading : liveGuidance?.heading ?? null,
+                  } : undefined,
                 } : undefined} />
               {guiding ? (
                 <View style={styles.mapStopCard}>
                   <View style={styles.mapStopToggle}>
                     <View style={styles.mapStopSummary}>
-                      <Text style={styles.stopName}>{next?.name}</Text>
-                      {liveGuidance && <Text style={styles.brand}>{liveGuidance.minutes} min · {formatDistance(liveGuidance.remaining)} restantes</Text>}
+                      {liveGuidance && <Text style={styles.guidanceTime}>{liveGuidance.arrived ? 'Arrivée' : `${liveGuidance.minutes} min`}</Text>}
+                      {liveGuidance && <Text style={styles.muted}>{formatDistance(liveGuidance.remaining)} restantes</Text>}
+                      <Text style={styles.brand}>{next?.name}</Text>
                     </View>
-                    <Pressable accessibilityRole="button" style={styles.inlineAction} onPress={() => setGuiding(false)}>
-                      <Text style={styles.brand}>Quitter</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Quitter le guidage" style={styles.quitGuidance} onPress={() => setGuiding(false)}>
+                      <Text style={styles.guidanceLabel}>Quitter</Text>
                     </Pressable>
                   </View>
                   {liveGuidance?.arrived && (
@@ -207,7 +245,8 @@ export default function App() {
                   )}
                   {routeError?.stopIndex === completed && <Text accessibilityLiveRegion="polite" style={styles.error}>{routeError.message}</Text>}
                 </View>
-              ) : <View style={styles.mapStopCard}>
+              ) : <ScrollView style={{ flexGrow: 0, maxHeight: windowHeight * 0.38 }}
+                contentContainerStyle={styles.mapStopCard} keyboardShouldPersistTaps="handled">
                 {next ? (
                   <Pressable accessibilityRole="button" accessibilityState={{ expanded: mapDetailsOpen }}
                     accessibilityHint={mapDetailsOpen ? 'Masquer les actions de cette étape' : 'Afficher les actions de cette étape'}
@@ -217,7 +256,7 @@ export default function App() {
                       <Text style={styles.stopName}>{next.name}</Text>
                       {routeSummary && <Text accessibilityLiveRegion="polite" style={styles.muted}>{routeSummary}</Text>}
                     </View>
-                    <Text style={styles.mapStopToggleLabel}>{mapDetailsOpen ? 'Réduire' : 'Itinéraire'}</Text>
+                    <Text style={styles.mapStopToggleLabel}>{mapDetailsOpen ? 'Fermer' : 'Itinéraire'}</Text>
                   </Pressable>
                 ) : (
                   <Text accessibilityLiveRegion="polite" style={styles.brand}>Toutes les étapes terminées</Text>
@@ -258,32 +297,11 @@ export default function App() {
                     </Pressable>
                   </>
                 )}
-              </View>}
+              </ScrollView>}
             </View>
           )}
 
-          <View accessibilityRole="tablist" style={styles.navigation}>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === 'organisation' }}
-              onPress={() => {
-                setGuiding(false);
-                setTab('organisation');
-              }}
-              style={[styles.tab, tab === 'organisation' && styles.activeTab]}
-            >
-              <Text style={styles.tabLabel}>Organisation</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === 'carte', disabled: !started }}
-              disabled={!started}
-              onPress={() => setTab('carte')}
-              style={[styles.tab, tab === 'carte' && styles.activeTab, !started && styles.disabled]}
-            >
-              <Text style={styles.tabLabel}>Carte</Text>
-            </Pressable>
-          </View>
+          {!guiding && <BottomNavigation selected={tab} onSelect={setTab} mapAvailable={started} />}
         </KeyboardAvoidingView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -316,20 +334,17 @@ const styles = StyleSheet.create({
   stop: { flex: 1, gap: 3 },
   inlineAction: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingVertical: 8 },
   mapScreen: { flex: 1 },
-  mapStopCard: { backgroundColor: '#fffdf8', paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
-  mapStopToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapStopSummary: { flex: 1, gap: 2 },
-  mapStopToggleLabel: { color: '#fff', backgroundColor: '#285b4b', fontWeight: '700', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, overflow: 'hidden' },
-  mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mapStopCard: { backgroundColor: '#fffdf8', paddingHorizontal: 20, paddingVertical: 14, gap: 12, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  mapStopToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  mapStopSummary: { flex: 1, gap: 5 },
+  mapStopToggleLabel: { color: '#285b4b', backgroundColor: '#edf3eb', fontWeight: '700', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, overflow: 'hidden' },
+  mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   directionsButton: { flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#eef3ed', borderWidth: 1, borderColor: '#d7e5d9' },
   selectedDirection: { backgroundColor: '#d9e7db', borderColor: '#285b4b' },
   guidanceButton: { backgroundColor: '#19372e' },
   guidanceLabel: { color: '#fff9ee', fontWeight: '800', textAlign: 'center' },
+  guidanceTime: { color: '#19372e', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  quitGuidance: { minHeight: 48, backgroundColor: '#923f32', paddingHorizontal: 20, justifyContent: 'center', borderRadius: 16 },
   stopName: { color: '#19372e', fontSize: 16, fontWeight: '700' },
   button: { minHeight: 46, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10, justifyContent: 'center' },
-  navigation: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 6, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ccd6cf' },
-  tab: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, padding: 4 },
-  activeTab: { backgroundColor: '#d9e7db' },
-  tabLabel: { color: '#19372e', fontWeight: '700', textAlign: 'center' },
-  disabled: { opacity: 0.55 },
 });

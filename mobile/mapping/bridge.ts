@@ -1,4 +1,5 @@
 export type Destination = { latitude: number; longitude: number };
+export type SelectedPlace = { id: string; name: string; address: string; coordinate: Destination };
 
 export function resolveViewerUrl(value: string | undefined, development: boolean, bundleUrl?: string) {
   if (!value && development && bundleUrl) {
@@ -29,6 +30,19 @@ export function viewerEvent(message: string) {
   try {
     const event = JSON.parse(message);
     if (event?.version !== 1) return;
+    if (event.type === 'placeSelected') {
+      const place = event.place;
+      const coordinate = place?.coordinate;
+      if (typeof place?.id !== 'string' || !place.id || place.id.length > 256
+        || typeof place.name !== 'string' || !place.name.trim() || place.name.length > 300
+        || typeof place.address !== 'string' || place.address.length > 1000
+        || !Number.isFinite(coordinate?.latitude) || Math.abs(coordinate.latitude) > 90
+        || !Number.isFinite(coordinate?.longitude) || Math.abs(coordinate.longitude) > 180) return;
+      return { type: 'placeSelected' as const, place: {
+        id: place.id, name: place.name.trim(), address: place.address,
+        coordinate: { latitude: coordinate.latitude, longitude: coordinate.longitude },
+      } };
+    }
     if (event.type === 'ready' || event.type === 'fallback' || event.type === 'error') return event.type as 'ready' | 'fallback' | 'error';
   } catch {
     return;

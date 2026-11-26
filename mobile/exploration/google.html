@@ -5,12 +5,31 @@
 <title>TravelBuddy · Google Maps</title>
 <style>
   html,body,#map{margin:0;width:100%;height:100%;background:#e6ebe2}
-  #search{position:absolute;bottom:96px;left:12px;right:64px;color:#19372e;font:14px system-ui}
+  #discovery{position:absolute;bottom:100px;left:12px;right:64px;color:#19372e;font:14px system-ui;display:grid;gap:6px}
   #search>gmp-place-autocomplete{width:100%;border-radius:14px;box-shadow:0 3px 12px #102c2640}
+  #categories{display:flex;gap:6px;overflow:auto}
+  button{font:600 14px system-ui;min-height:44px;border:0;border-radius:12px;padding:10px 12px;background:#fff9ee;color:#19372e;cursor:pointer}
+  button:focus-visible{outline:3px solid #285b4b;outline-offset:2px}
+  button[aria-pressed="true"],.add-place{background:#19372e;color:#fff9ee}
+  #results{max-height:20vh;overflow:auto;background:#fff9ee;border-radius:12px}
+  .place-result{display:block;width:100%;text-align:left;border-bottom:1px solid #d9e7db;border-radius:0}
+  .place-result small{display:block;font-weight:400;margin-top:4px}
+  .place-details{max-width:230px;color:#19372e;font:14px system-ui;display:grid;gap:8px}
+  #search-message{margin:0;background:#fff9ee;border-radius:10px;padding:8px}
+  #search-message:empty{display:none}
   #status{position:absolute;bottom:68px;left:12px;max-width:75%;padding:8px;background:#fff;color:#19372e;border-radius:8px;font:14px system-ui}
 </style>
 <div id="map"></div>
-<div id="search"></div>
+<section id="discovery" aria-label="Lieux autour du centre de la carte">
+  <div id="search"></div>
+  <div id="categories" aria-label="Rechercher dans un rayon de 2 km">
+    <button data-type="restaurant" aria-pressed="false">Restaurants</button>
+    <button data-type="cafe" aria-pressed="false">Cafés</button>
+    <button data-type="gas_station" aria-pressed="false">Stations</button>
+  </div>
+  <p id="search-message" role="status"></p>
+  <div id="results"></div>
+</section>
 <div id="status" role="status">Chargement de Google Maps…</div>
 <script src="google-config.js" defer></script>
 <script src="google.js" defer></script>

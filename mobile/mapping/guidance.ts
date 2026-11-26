@@ -23,6 +23,10 @@ export function getGuidance(route: WalkingRoute, position: Destination) {
   let length = 0;
   let closest = Infinity;
   let offset = 0;
+  let segmentIndex = 0;
+  let nearestIndex = 0;
+  let heading = 0;
+  let nearestFraction = 0;
   for (const coordinate of route.coordinates.slice(1)) {
     const point = project(coordinate);
     const dx = point.x - previous.x;
@@ -34,7 +38,11 @@ export function getGuidance(route: WalkingRoute, position: Destination) {
     if (distance < closest) {
       closest = distance;
       offset = length + fraction * segment;
+      nearestIndex = segmentIndex;
+      nearestFraction = fraction;
+      heading = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
     }
+    segmentIndex += 1;
     length += segment;
     previous = point;
   }
@@ -44,7 +52,18 @@ export function getGuidance(route: WalkingRoute, position: Destination) {
   const offRoute = closest > 65;
   const arrived = remaining < 20 && Math.hypot(previous.x, previous.y) < 35;
   const step = route.maneuvers?.find(({ type, offset }) => type !== 'depart' && offset >= distanceTraveled - 8);
+  const following = step && route.maneuvers?.[route.maneuvers.indexOf(step) + 1];
+  const segmentStart = route.coordinates[nearestIndex];
+  const segmentEnd = route.coordinates[nearestIndex + 1] ?? segmentStart;
+  const snappedPosition = {
+    latitude: segmentStart.latitude + (segmentEnd.latitude - segmentStart.latitude) * nearestFraction,
+    longitude: segmentStart.longitude + (segmentEnd.longitude - segmentStart.longitude) * nearestFraction,
+  };
   return {
+    heading,
+    remainingCoordinates: [snappedPosition, ...route.coordinates.slice(nearestIndex + 1)],
+    arrow: offRoute ? '↻' : arrived ? '✓' : maneuverArrow(step),
+    following: !offRoute && !arrived && following ? `Puis ${maneuverArrow(following)} ${instructionFor(following)}` : undefined,
     remaining,
     minutes: route.distance > 0 ? Math.ceil(route.duration * remaining / route.distance / 60) : 0,
     offRoute,
@@ -52,6 +71,16 @@ export function getGuidance(route: WalkingRoute, position: Destination) {
     instruction: offRoute ? 'Hors itinéraire' : arrived ? 'Vous êtes arrivé' : instructionFor(step),
     detail: !offRoute && !arrived && step ? `Dans ${formatDistance(Math.max(0, step.offset - distanceTraveled))}` : '',
   };
+}
+
+function maneuverArrow(step?: RouteManeuver) {
+  if (!step) return '↑';
+  if (step.type === 'arrive') return '⚑';
+  if (step.modifier === 'uturn') return '↶';
+  if (step.type === 'roundabout' || step.type === 'rotary') return '↻';
+  if (step.modifier?.includes('left')) return '↰';
+  if (step.modifier?.includes('right')) return '↱';
+  return '↑';
 }
 
 function instructionFor(step?: RouteManeuver) {

@@ -36,7 +36,7 @@ Sans configuration Mapbox, la carte de démonstration utilise Apple Maps sur iOS
 
 Le routage sans jeton Mapbox utilise le service public OSRM/FOSSGIS, adapté aux essais légers. Configurer Mapbox Directions pour la production. Sans URL de viewer, le sélecteur Explorer est masqué. Une erreur du viewer ramène à la carte native.
 
-La recherche actuelle porte sur les étapes locales du voyage. Mapbox Search Box documente la prise en charge des États-Unis, du Canada et de l’Europe. Pour ajouter des lieux proches à Marrakech, valider un fournisseur qui couvre le Maroc et dont les droits autorisent l’affichage et la conservation nécessaires. [Couverture Search Box](https://docs.mapbox.com/api/search/search-box/#supported-geographies)
+La recherche actuelle porte sur les étapes locales du voyage. Mapbox Search Box documente la prise en charge des États-Unis, du Canada et de l’Europe. Pour ajouter des lieux proches à Fès, valider un fournisseur qui couvre le Maroc et dont les droits autorisent l’affichage et la conservation nécessaires. [Couverture Search Box](https://docs.mapbox.com/api/search/search-box/#supported-geographies)
 
 ## Vérification
 
@@ -45,4 +45,4 @@ pnpm exec tsc --noEmit
 node --test mapping/mapping.test.mjs
 ```
 
-Sur chaque plateforme, démarrer la démo de Marrakech, vérifier la sélection, les trajets piétons et routiers à proximité, le GPS accepté ou refusé et la progression dans Organisation. Depuis Explorer, vérifier le survol, la sélection conservée au retour, les crédits visibles, le rendu sans tuiles photoréalistes et le retour à Navigation en cas d’erreur. Tester le mode sombre, la perte de réseau et les changements répétés de mode sur un téléphone moins puissant.
+Sur chaque plateforme, démarrer la démo de Fès, vérifier la sélection, les trajets piétons et routiers à proximité, le GPS accepté ou refusé et la progression dans Organisation. Depuis Explorer, vérifier le survol, la sélection conservée au retour, les crédits visibles, le rendu sans tuiles photoréalistes et le retour à Navigation en cas d’erreur. Tester le mode sombre, la perte de réseau et les changements répétés de mode sur un téléphone moins puissant.

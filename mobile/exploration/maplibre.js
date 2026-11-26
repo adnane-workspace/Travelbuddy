@@ -17,7 +17,7 @@ async function start() {
   const map = new Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/bright',
-    center: [-7.9948, 31.634],
+    center: [-4.978, 34.064],
     zoom: 13,
     maxPitch: 75,
   });
@@ -78,7 +78,7 @@ async function start() {
     status.hidden = true;
     notify('ready');
     if (!window.ReactNativeWebView) window.travelBuddy.receive({
-      version: 1, type: 'flyTo', destination: { longitude: -8.0032, latitude: 31.6417 }, flat: false,
+      version: 1, type: 'flyTo', destination: { longitude: -4.98389, latitude: 34.06167 }, flat: false,
     });
   });
   window.addEventListener('pagehide', () => map.remove(), { once: true });

@@ -1,6 +1,6 @@
 # TravelBuddy
 
-Application mobile de voyage en React Native, Expo et TypeScript. La démonstration propose un programme à Marrakech, une carte satellite, des itinéraires à pied ou en voiture et un guidage GPS dans l’application.
+Application mobile de voyage en React Native, Expo et TypeScript. La démonstration propose un programme à Fès, une carte satellite, des itinéraires à pied ou en voiture et un guidage GPS dans l’application.
 
 ## Prérequis
 
@@ -85,6 +85,10 @@ Préparer une clé navigateur Google Cloud avec Maps JavaScript API et Places AP
 ```
 
 Saisir la clé à l’invite. Le serveur fournit cette clé au navigateur pour charger Google Maps. Ce mode propose les couches cartographiques, Street View selon la couverture et une recherche de lieux. Le code utilise `DEMO_MAP_ID` pour les essais.
+
+Dans Explorer, choisir **Restaurants**, **Cafés** ou **Stations** pour rechercher jusqu’à huit lieux dans un rayon de 2 km autour du centre de la carte. Déplacer la carte puis relancer la catégorie pour changer de zone. Sélectionner un résultat et appuyer sur **Ajouter comme prochaine étape**. TravelBuddy revient à l’itinéraire, où **À pied** ou **En voiture** calcule le trajet vers le lieu ajouté. Cette étape apparaît aussi dans Organisation. Les ajouts sont conservés pendant la session et sont réinitialisés au redémarrage de l’application.
+
+La recherche utilise Places API (New) et les quotas de la clé Google configurée. Les champs demandés sont l’identifiant, le nom, l’adresse et la position du lieu.
 
 ### Cesium
 
