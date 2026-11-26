@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TravelBuddy · Google Maps</title>
+<style>
+  html,body,#map{margin:0;width:100%;height:100%;background:#e6ebe2}
+  #search{position:absolute;bottom:96px;left:12px;right:64px;color:#19372e;font:14px system-ui}
+  #search>gmp-place-autocomplete{width:100%;border-radius:14px;box-shadow:0 3px 12px #102c2640}
+  #status{position:absolute;bottom:68px;left:12px;max-width:75%;padding:8px;background:#fff;color:#19372e;border-radius:8px;font:14px system-ui}
+</style>
+<div id="map"></div>
+<div id="search"></div>
+<div id="status" role="status">Chargement de Google Maps…</div>
+<script src="google-config.js" defer></script>
+<script src="google.js" defer></script>
+</html>

@@ -1,15 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
+import type { Destination } from './mapping/bridge';
+import type { RouteManeuver } from './mapping/guidance';
 
 export type WalkingRoute = {
   coordinates: { latitude: number; longitude: number }[];
   distance: number;
   duration: number;
+  maneuvers?: RouteManeuver[];
 };
 
 export type TripMapProps = {
   completed: number;
-  traveling: boolean;
   showPosition: boolean;
+  routeDestination?: string;
+  guidance?: { instruction: string; detail: string; position?: Destination & { heading: number | null } };
   onPositionEnabled?: () => void;
   walkingRoute?: WalkingRoute;
 };

@@ -9,7 +9,7 @@ import type { TripMapProps } from '../TripMap';
 const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 if (token?.startsWith('pk.')) void Mapbox.setAccessToken(token);
 
-export default function NavigationMap({ completed, showPosition, onPositionEnabled, walkingRoute, selected, onSelect, flat, dark, onFailure }: TripMapProps & {
+export default function NavigationMap({ completed, showPosition, onPositionEnabled, walkingRoute, routeDestination, guidance, selected, onSelect, flat, dark, onFailure }: TripMapProps & {
   selected: number;
   onSelect: (index: number) => void;
   flat: boolean;
@@ -20,10 +20,12 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
   const [ready, setReady] = useState(false);
   const [positionMessage, setPositionMessage] = useState('');
   const stop = stops[selected];
-  const route = walkingRoute?.coordinates ?? routeCoordinates;
+  const route = walkingRoute?.coordinates ?? (routeDestination ? undefined : routeCoordinates);
+  const guiding = guidance !== undefined;
+  const position = guidance?.position;
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || guiding) return;
     if (walkingRoute && selected === completed) {
       let west = Infinity;
       let south = Infinity;
@@ -36,7 +38,7 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
         north = Math.max(north, latitude);
       }
       camera.current?.setCamera({
-        bounds: { ne: [east, north], sw: [west, south], paddingTop: 100, paddingBottom: 60, paddingLeft: 50, paddingRight: 50 },
+        bounds: { ne: [east, north], sw: [west, south], paddingTop: routeDestination ? 155 : 100, paddingBottom: 60, paddingLeft: 50, paddingRight: 50 },
         pitch: flat ? 0 : 40, animationMode: 'easeTo', animationDuration: 1100,
       });
     } else {
@@ -45,7 +47,16 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
         pitch: flat ? 0 : 55, zoomLevel: flat ? 14 : 16, animationDuration: 1400, animationMode: 'flyTo',
       });
     }
-  }, [ready, stop, flat, walkingRoute, selected, completed]);
+  }, [ready, stop, flat, walkingRoute, routeDestination, selected, completed, guiding]);
+
+  useEffect(() => {
+    if (!ready || !position) return;
+    camera.current?.setCamera({
+      centerCoordinate: [position.longitude, position.latitude],
+      zoomLevel: 17, pitch: 58, animationMode: 'easeTo', animationDuration: 650,
+      ...(position.heading !== null && position.heading >= 0 && { heading: position.heading }),
+    });
+  }, [ready, position]);
 
   useEffect(() => {
     if (ready) return;
@@ -81,12 +92,12 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
         </Mapbox.RasterDemSource>
       )}
       {showPosition && <Mapbox.LocationPuck />}
-      <Mapbox.ShapeSource id="trip-route" shape={{ type: 'Feature', properties: {}, geometry: {
+      {route && <Mapbox.ShapeSource id="trip-route" shape={{ type: 'Feature', properties: {}, geometry: {
         type: 'LineString', coordinates: route.map(({ longitude, latitude }) => [longitude, latitude]),
       } }}>
         <Mapbox.LineLayer id="trip-route-outline" style={{ lineColor: '#102c26', lineWidth: 8, lineJoin: 'round' }} />
         <Mapbox.LineLayer id="trip-route-line" style={{ lineColor: '#6ce5bc', lineWidth: 5, lineJoin: 'round' }} />
-      </Mapbox.ShapeSource>
+      </Mapbox.ShapeSource>}
       {stops.map(({ name, coordinate }, index) => (
         <Mapbox.PointAnnotation key={name} id={`stop-${index}`} title={name}
           coordinate={[coordinate.longitude, coordinate.latitude]} onSelected={() => onSelect(index)}>
@@ -96,7 +107,7 @@ export default function NavigationMap({ completed, showPosition, onPositionEnabl
         </Mapbox.PointAnnotation>
       ))}
     </Mapbox.MapView>
-    {ready && (
+    {ready && !guiding && (
       <Pressable accessibilityRole="button" style={styles.recenter} onPress={() => void recenter()}>
         <Text accessibilityLiveRegion="polite" style={styles.recenterLabel}>{positionMessage || 'Ma position'}</Text>
       </Pressable>

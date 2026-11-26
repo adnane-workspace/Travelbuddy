@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { resolveViewerUrl, viewerCommand, viewerEvent } from './bridge.ts';
 import { fetchRoute } from './routing.ts';
+import { getGuidance } from './guidance.ts';
 
 const start = { longitude: -8.0032, latitude: 31.6417 };
 const end = { longitude: -7.9878, latitude: 31.6311 };
@@ -68,12 +69,34 @@ test('directions use the correct profile and convert GeoJSON coordinates', async
   const calls = context.mock.method(globalThis, 'fetch', async () => Response.json({
     code: 'Ok', routes: [{ distance: 2100, duration: 900, geometry: { coordinates: [
       [start.longitude, start.latitude], [end.longitude, end.latitude],
-    ] } }],
+    ] }, legs: [{ steps: [
+      { distance: 700, maneuver: { type: 'depart' } },
+      { distance: 1400, name: 'Rue du Jardin', maneuver: { type: 'turn', modifier: 'right' } },
+    ] }] }],
   }));
-  assert.deepEqual(await fetchRoute(start, end, 'walking'), { coordinates: [start, end], distance: 2100, duration: 900 });
+  const route = await fetchRoute(start, end, 'walking');
+  assert.deepEqual(route.coordinates, [start, end]);
+  assert.equal(route.distance, 2100);
+  assert.equal(route.duration, 900);
+  assert.equal(route.maneuvers[1].offset, 700);
+  assert.match(calls.mock.calls[0].arguments[0], /steps=true/);
   await fetchRoute(start, end, 'driving');
   assert.match(calls.mock.calls[0].arguments[0], /mapbox\/walking\//);
   assert.match(calls.mock.calls[1].arguments[0], /mapbox\/driving\//);
   calls.mock.mockImplementation(async () => Response.json({ code: 'NoRoute' }));
   await assert.rejects(fetchRoute(start, end, 'walking'), /Route unavailable/);
+});
+
+test('guidance advances along the route and detects deviation and arrival', () => {
+  const route = {
+    coordinates: [{ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0.01 }],
+    distance: 1000, duration: 600,
+    maneuvers: [{ type: 'turn', offset: 500, modifier: 'right', road: 'Rue du Jardin' }, { type: 'arrive', offset: 1000 }],
+  };
+  const before = getGuidance(route, { latitude: 0, longitude: 0.0025 });
+  assert.equal(before.instruction, 'Tournez à droite vers Rue du Jardin');
+  assert.equal(before.detail, 'Dans 250 m');
+  assert.equal(getGuidance(route, { latitude: 0, longitude: 0.008 }).instruction, 'Rejoignez votre destination');
+  assert.equal(getGuidance(route, { latitude: 0.001, longitude: 0.005 }).offRoute, true);
+  assert.equal(getGuidance(route, route.coordinates[1]).arrived, true);
 });

@@ -12,9 +12,15 @@ pnpm dlx eas-cli build --platform ios --profile development
 
 Sur macOS, `pnpm exec expo run:ios` permet aussi un build local. Le profil EAS `production` sert aux builds signés destinés aux boutiques. Confirmer les identifiants `com.travelbuddy.app` avant toute publication.
 
-Si le terminal affiche `@rnmapbox/maps native code not available`, le client ouvert ne contient pas Mapbox. Cela arrive avec Expo Go ou un Development Build compilé avant l’ajout du SDK. Pour activer Mapbox sur iPhone, reconstruire et installer le Development Build, démarrer Metro avec `pnpm exec expo start --dev-client`, puis ouvrir le client TravelBuddy installé. Sans module Mapbox, la carte iOS utilise Apple Maps.
+En mode Navigation, iOS utilise Apple Maps par défaut et Google Maps dans un build configuré pour ce SDK. Sur Android, Navigation utilise Google Maps dans Expo Go ou dans un build configuré pour ce SDK. Mapbox prend le relais sur Android si la carte Google est indisponible, si le build contient RNMapbox et si un jeton public Mapbox est configuré.
 
 ## Fournisseurs
+
+### Google Maps
+
+Pour essayer Google Maps sur iPhone avec Expo Go, activer **Maps JavaScript API** et **Places API (New)** dans un projet Google Cloud avec facturation. Créer une clé navigateur limitée à ces API et à l’adresse d’origine de l’aperçu (par exemple `http://192.168.1.7:8766/*`). Arrêter le serveur d’aperçu précédent, puis exécuter `python backend/exploration_preview.py --google` depuis la racine et saisir la clé navigateur à l’invite. Ouvrir **Carte → Explorer en 3D**. Ce viewer propose la carte vectorielle, les couches Google, Street View selon la couverture et la recherche de lieux avec adresse. Pour un hébergement public, utiliser HTTPS, une origine dédiée, une clé séparée et des quotas adaptés. La clé de démonstration de style `DEMO_MAP_ID` doit être remplacée par un identifiant de carte du projet pour la publication.
+
+Pour le SDK natif iOS, configurer `EXPO_PUBLIC_IOS_GOOGLE_MAPS_API_KEY` avec une clé limitée à **Maps SDK for iOS** et au bundle `com.travelbuddy.app`, puis reconstruire le client. Sur Android, `EXPO_PUBLIC_ANDROID_GOOGLE_MAPS_API_KEY` configure **Maps SDK for Android** pour un build propre à TravelBuddy. La carte iOS d’Expo Go conserve le rendu Apple natif dans Navigation. Le viewer Google reste disponible dans Explorer si le serveur a été lancé avec `--google`.
 
 ### Aperçu MapLibre dans Expo Go
 

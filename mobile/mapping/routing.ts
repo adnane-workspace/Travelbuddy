@@ -8,8 +8,8 @@ export async function fetchRoute(origin: Destination, destination: Destination, 
   const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const useMapbox = token?.startsWith('pk.');
   const url = useMapbox
-    ? `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordinates}?geometries=geojson&overview=full&access_token=${encodeURIComponent(token)}`
-    : `https://routing.openstreetmap.de/routed-${profile === 'walking' ? 'foot' : 'car'}/route/v1/driving/${coordinates}?geometries=geojson&overview=full&radiuses=1000;1000`;
+    ? `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordinates}?geometries=geojson&overview=full&steps=true&language=fr&access_token=${encodeURIComponent(token)}`
+    : `https://routing.openstreetmap.de/routed-${profile === 'walking' ? 'foot' : 'car'}/route/v1/driving/${coordinates}?geometries=geojson&overview=full&steps=true&radiuses=1000;1000`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -22,6 +22,7 @@ export async function fetchRoute(origin: Destination, destination: Destination, 
       distance: number;
       duration: number;
       geometry?: { coordinates: [number, number][] };
+      legs?: { steps?: { name?: string; distance: number; maneuver?: { type?: string; modifier?: string; instruction?: string } }[] }[];
     }[] } = await response.json();
     const route = routes?.[0];
     const points = route?.geometry?.coordinates;
@@ -30,10 +31,17 @@ export async function fetchRoute(origin: Destination, destination: Destination, 
       || !points.every((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))) {
       throw new Error('Route unavailable');
     }
+    let offset = 0;
+    const maneuvers = (route.legs ?? []).flatMap(({ steps }) => steps ?? []).map(({ maneuver, name, distance }) => {
+      const step = { ...maneuver, road: name, offset };
+      if (Number.isFinite(distance) && distance > 0) offset += distance;
+      return step;
+    });
     return {
       coordinates: points.map(([longitude, latitude]) => ({ longitude, latitude })),
       distance: route.distance,
       duration: route.duration,
+      ...(maneuvers.length > 0 && { maneuvers }),
     };
   } finally {
     clearTimeout(timeout);
